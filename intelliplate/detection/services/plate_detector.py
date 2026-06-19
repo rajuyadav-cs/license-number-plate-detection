@@ -3,8 +3,6 @@ import urllib.request
 import cv2
 from django.conf import settings
 
-from .ocr_reader import read_plate_text
-
 
 MODEL_URL = "https://huggingface.co/rajuyadav-cs/licence-number-plate-detection/resolve/main/licence_plate_detection.pt"
 MODEL_DIR = settings.BASE_DIR / "ml_models"
@@ -78,9 +76,7 @@ def detect_license_plate(image_path):
             plate_crop_relative_path = str(crop_relative_path).replace("\\", "/")
             plate_crop_url = f"{settings.MEDIA_URL}{plate_crop_relative_path}"
 
-            plate_number = read_plate_text(crop_path)
-
-        label_text = f"{plate_number or 'Plate'} {confidence:.2f}"
+        label_text = f"Plate {confidence:.2f}"
 
         cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
         cv2.putText(
