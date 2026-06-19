@@ -1,0 +1,70 @@
+from pathlib import Path
+import cv2
+from ultralytics import YOLO
+from django.conf import settings
+
+from .ocr_reader import read_plate_text
+
+
+MODEL_PATH = settings.BASE_DIR / "ml_models" / "licence_plate_detection.pt"
+model = YOLO(MODEL_PATH)
+
+
+def detect_license_plate(image_path):
+    image_path = Path(image_path)
+    image = cv2.imread(str(image_path))
+
+    results = model(image)
+    result = results[0]
+
+    plate_crop_url = None
+    plate_crop_relative_path = None
+    best_confidence = 0.0
+    plate_number = None
+
+    for index, box in enumerate(result.boxes):
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
+        confidence = float(box.conf[0])
+
+        if confidence > best_confidence:
+            best_confidence = confidence
+
+            plate_crop = image[y1:y2, x1:x2]
+            crop_filename = f"plate_crop_{image_path.stem}_{index}.jpg"
+            crop_path = settings.MEDIA_ROOT / "plate_crops" / crop_filename
+
+            cv2.imwrite(str(crop_path), plate_crop)
+
+            plate_crop_relative_path = f"plate_crops/{crop_filename}"
+            plate_crop_url = f"{settings.MEDIA_URL}{plate_crop_relative_path}"
+
+            plate_number = read_plate_text(crop_path)
+
+        label_text = f"{plate_number or 'Plate'} {confidence:.2f}"
+
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        cv2.putText(
+            image,
+            label_text,
+            (x1, max(y1 - 10, 20)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 0, 0),
+            2,
+        )
+
+    result_filename = f"result_{image_path.name}"
+    result_relative_path = f"results/{result_filename}"
+    result_path = settings.MEDIA_ROOT / result_relative_path
+
+    cv2.imwrite(str(result_path), image)
+
+    return {
+        "plate_number": plate_number,
+        "result_image_url": f"{settings.MEDIA_URL}{result_relative_path}",
+        "result_image_path": result_relative_path,
+        "plate_crop_url": plate_crop_url,
+        "plate_crop_path": plate_crop_relative_path,
+        "detections_count": len(result.boxes),
+        "confidence": round(best_confidence, 2),
+    }
