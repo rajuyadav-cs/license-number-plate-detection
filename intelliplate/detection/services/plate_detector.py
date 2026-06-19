@@ -1,7 +1,6 @@
 from pathlib import Path
 import urllib.request
 import cv2
-from ultralytics import YOLO
 from django.conf import settings
 
 from .ocr_reader import read_plate_text
@@ -27,6 +26,8 @@ def get_model():
     global _model
 
     if _model is None:
+        from ultralytics import YOLO
+
         download_model_if_missing()
         _model = YOLO(str(MODEL_PATH))
 
