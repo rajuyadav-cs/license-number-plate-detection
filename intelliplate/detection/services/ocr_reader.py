@@ -1,7 +1,16 @@
 import cv2
 import easyocr
 
-reader = easyocr.Reader(["en"], gpu=False)
+_reader = None
+
+
+def get_reader():
+    global _reader
+
+    if _reader is None:
+        _reader = easyocr.Reader(["en"], gpu=False)
+
+    return _reader
 
 
 def read_plate_text(image_path):
@@ -13,6 +22,7 @@ def read_plate_text(image_path):
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+        reader = get_reader()
         results = reader.readtext(image_rgb)
 
         if not results:
