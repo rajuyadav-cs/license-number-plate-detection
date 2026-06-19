@@ -1,35 +1,14 @@
 from pathlib import Path
-import urllib.request
 import cv2
+from ultralytics import YOLO
 from django.conf import settings
 
-
-MODEL_URL = "https://huggingface.co/rajuyadav-cs/licence-number-plate-detection/resolve/main/licence_plate_detection.pt"
-MODEL_DIR = settings.BASE_DIR / "ml_models"
-MODEL_PATH = MODEL_DIR / "licence_plate_detection.pt"
-
-_model = None
+from .ocr_reader import read_plate_text
 
 
-def download_model_if_missing():
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_PATH = settings.BASE_DIR / "ml_models" / "licence_plate_detection.pt"
 
-    if not MODEL_PATH.exists():
-        print("Downloading YOLO model from Hugging Face...")
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-        print("YOLO model downloaded successfully.")
-
-
-def get_model():
-    global _model
-
-    if _model is None:
-        from ultralytics import YOLO
-
-        download_model_if_missing()
-        _model = YOLO(str(MODEL_PATH))
-
-    return _model
+model = YOLO(MODEL_PATH)
 
 
 def detect_license_plate(image_path):
@@ -46,8 +25,6 @@ def detect_license_plate(image_path):
             "detections_count": 0,
             "confidence": 0.0,
         }
-
-    model = get_model()
 
     results = model(image)
     result = results[0]
@@ -76,7 +53,9 @@ def detect_license_plate(image_path):
             plate_crop_relative_path = str(crop_relative_path).replace("\\", "/")
             plate_crop_url = f"{settings.MEDIA_URL}{plate_crop_relative_path}"
 
-        label_text = f"Plate {confidence:.2f}"
+            plate_number = read_plate_text(crop_path)
+
+        label_text = f"{plate_number or 'Plate'} {confidence:.2f}"
 
         cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
         cv2.putText(
